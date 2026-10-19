@@ -157,7 +157,7 @@ kbd { min-width: 20px; height: 20px; padding: 0 5px; display: inline-grid; place
   .scene-topline { top: 17px; left: 17px; right: 65px; font-size: 8px; }
   .scene-topline { display: block; }
   .weather { position: absolute; top: 19px; left: 0; gap: 5px; font-size: 7px; }
-  .net-button { bottom: 19px; left: auto; right: 12px; min-width: 180px; height: 51px; padding: 0 9px; gap: 7px; transform: none; }
+  .net-button { bottom: calc(54px + env(safe-area-inset-bottom, 0px)); left: auto; right: 12px; min-width: 180px; height: 51px; padding: 0 9px; gap: 7px; transform: none; }
   .net-button strong { font-size: 9px; }
   .net-button small { font-size: 7px; }
   .net-button kbd { display: none; }
