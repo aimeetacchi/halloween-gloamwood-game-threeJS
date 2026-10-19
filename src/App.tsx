@@ -14,7 +14,7 @@ const ghostRoster: GhostInfo[] = [
   { id: 'moonbeam', name: 'Moonbeam', kind: 'Moonlit Spirit', color: '#a9c8ff', accent: '#759ef0', x: 4.35, z: 1.45, rarity: 'RARE' },
 ]
 
-function Ghostling({ data, caught, player, onApproach }: { data: GhostInfo; caught: boolean; player: [number, number]; onApproach: (id: string, near: boolean) => void }) {
+function Ghostling({ data, caught, player, onApproach, onCatch }: { data: GhostInfo; caught: boolean; player: [number, number]; onApproach: (id: string, near: boolean) => void; onCatch: (id: string) => void }) {
   const group = useRef<THREE.Group>(null)
   const sheetGhost = useGLTF('/models/nikkimorin-ghost.glb')
   const batGhost = useGLTF('/models/quaternius-ghost.glb')
@@ -56,7 +56,7 @@ function Ghostling({ data, caught, player, onApproach }: { data: GhostInfo; caug
     group.current.rotation.y = Math.sin(t * 0.7) * 0.18
   })
   if (caught) return null
-  return <group ref={group}><primitive object={model} scale={useBatGhost ? 0.28 : 0.42} /><pointLight color={data.color} intensity={0.75} distance={2.7} /></group>
+  return <group ref={group} onClick={(event) => { event.stopPropagation(); onCatch(data.id) }}><primitive object={model} scale={useBatGhost ? 0.28 : 0.42} /><pointLight color={data.color} intensity={0.75} distance={2.7} /></group>
 }
 
 function Player({ input, paused, playerRef, onMove, netSwing, resetVersion }: { input: React.MutableRefObject<Set<string>>; paused: boolean; playerRef: React.MutableRefObject<THREE.Group | null>; onMove: (x: number, z: number) => void; netSwing: number; resetVersion: number }) {
@@ -156,7 +156,7 @@ function Player({ input, paused, playerRef, onMove, netSwing, resetVersion }: { 
   </group>
 }
 
-function WitchKeeper({ caught, player, onApproach }: { caught: boolean; player: [number, number]; onApproach: (id: string, near: boolean) => void }) {
+function WitchKeeper({ caught, player, onApproach, onCatch }: { caught: boolean; player: [number, number]; onApproach: (id: string, near: boolean) => void; onCatch: (id: string) => void }) {
   const gltf = useGLTF('/models/quaternius-witch.glb')
   const model = useMemo(() => clone(gltf.scene), [gltf.scene])
   const { actions } = useAnimations(gltf.animations, model)
@@ -170,7 +170,7 @@ function WitchKeeper({ caught, player, onApproach }: { caught: boolean; player: 
   }, [caught, player, onApproach])
   useEffect(() => () => onApproach('witch', false), [onApproach])
   if (caught) return null
-  return <group position={[-2.5, 0, 1.3]} rotation={[0, Math.PI * 0.82, 0]} scale={0.82}>
+  return <group position={[-2.5, 0, 1.3]} rotation={[0, Math.PI * 0.82, 0]} scale={0.82} onClick={(event) => { event.stopPropagation(); onCatch('witch') }}>
     <primitive object={model} />
     <pointLight position={[0, 1.1, 0.15]} color="#ffcf93" intensity={0.32} distance={2.4} />
   </group>
@@ -202,7 +202,7 @@ function Grave({ position, rotation = 0 }: { position: [number, number, number];
   </group>
 }
 
-function CastleScene({ caught, player, input, paused, onMove, onApproach, netSwing, resetVersion }: { caught: string[]; player: [number, number]; input: React.MutableRefObject<Set<string>>; paused: boolean; onMove: (x: number, z: number) => void; onApproach: (id: string, near: boolean) => void; netSwing: number; resetVersion: number }) {
+function CastleScene({ caught, player, input, paused, onMove, onApproach, onCatchSpirit, netSwing, resetVersion }: { caught: string[]; player: [number, number]; input: React.MutableRefObject<Set<string>>; paused: boolean; onMove: (x: number, z: number) => void; onApproach: (id: string, near: boolean) => void; onCatchSpirit: (id: string) => void; netSwing: number; resetVersion: number }) {
   const playerRef = useRef<THREE.Group | null>(null)
   return <>
     <color attach="background" args={['#11101d']} />
@@ -233,8 +233,8 @@ function CastleScene({ caught, player, input, paused, onMove, onApproach, netSwi
     <mesh position={[0, 0.18, 2.1]}><cylinderGeometry args={[0.85, 0.95, 0.35, 24]} /><meshStandardMaterial color="#353445" /></mesh>
     <mesh position={[0, 0.37, 2.1]}><cylinderGeometry args={[0.62, 0.68, 0.06, 24]} /><meshStandardMaterial color="#5a5264" /></mesh>
     <Player input={input} paused={paused} playerRef={playerRef} onMove={onMove} netSwing={netSwing} resetVersion={resetVersion} />
-    <WitchKeeper caught={caught.includes('witch')} player={player} onApproach={onApproach} />
-    {ghostRoster.map(g => <Ghostling key={g.id} data={g} caught={caught.includes(g.id)} player={player} onApproach={onApproach} />)}
+    <WitchKeeper caught={caught.includes('witch')} player={player} onApproach={onApproach} onCatch={onCatchSpirit} />
+    {ghostRoster.map(g => <Ghostling key={g.id} data={g} caught={caught.includes(g.id)} player={player} onApproach={onApproach} onCatch={onCatchSpirit} />)}
     <Sparkles count={70} scale={[12, 6, 12]} size={2} speed={0.25} color="#b3a6dc" opacity={0.48} />
     <ContactShadows position={[0, 0.01, 0]} opacity={0.3} scale={18} blur={2.5} far={8} />
   </>
@@ -287,11 +287,12 @@ function App() {
     }
   }, [caught, gameOver, lives, paused, showCongratulations])
   const markApproach = useCallback((id: string, near: boolean) => { setNearby(current => near ? id : current === id ? null : current) }, [])
-  const catchGhost = useCallback(() => {
+  const catchGhost = useCallback((requestedId?: string) => {
     setNetSwing(value => value + 1)
     if (paused || throwing) return
-    const target = nearby ? ghostRoster.find(g => g.id === nearby && !caught.includes(g.id)) : null
-    const targetId = target?.id ?? (nearby === 'witch' && !caught.includes('witch') ? 'witch' : null)
+    const selected = requestedId ?? nearby
+    const target = selected ? ghostRoster.find(g => g.id === selected && !caught.includes(g.id)) : null
+    const targetId = target?.id ?? (selected === 'witch' && !caught.includes('witch') ? 'witch' : null)
     if (!targetId) { setNotice('Too far away! Get a little closer to a ghost.'); return }
     const targetName = target?.name ?? 'the Witch Keeper'
     setThrowing(true)
@@ -302,6 +303,18 @@ function App() {
       setNotice(targetId === 'witch' ? 'Bonus caught! The Witch Keeper joined your collection! ✨' : `${targetName} joined your ghost collection! ✨`)
     }, 700)
   }, [caught, nearby, paused, throwing])
+  const tapSpirit = useCallback((id: string) => {
+    if (paused || throwing) return
+    const ghost = ghostRoster.find(item => item.id === id)
+    const targetX = id === 'witch' ? -2.5 : ghost?.x
+    const targetZ = id === 'witch' ? 1.3 : ghost?.z
+    if (targetX === undefined || targetZ === undefined) return
+    if (Math.hypot(targetX - player[0], targetZ - player[1]) > 2.05) {
+      setNotice('Too far away! Move closer, then tap the spirit to catch it.')
+      return
+    }
+    catchGhost(id)
+  }, [catchGhost, paused, player, throwing])
   const toggleSound = () => {
     const enabled = !sound
     setSound(enabled)
@@ -342,7 +355,7 @@ function App() {
 
   return <main className="game-shell">
     <audio ref={music} src="/audio/silent-spooky-halloween.mp3" loop preload="none" />
-    <div className="game-scene"><Canvas shadows dpr={[1, 1.6]} gl={{ antialias: true }}><CastleScene caught={caught} player={player} input={input} paused={paused} onMove={handleMove} onApproach={markApproach} netSwing={netSwing} resetVersion={resetVersion} /></Canvas><div className="scene-vignette" /><div className="scene-grain" />
+    <div className="game-scene"><Canvas shadows dpr={[1, 1.6]} gl={{ antialias: true }}><CastleScene caught={caught} player={player} input={input} paused={paused} onMove={handleMove} onApproach={markApproach} onCatchSpirit={tapSpirit} netSwing={netSwing} resetVersion={resetVersion} /></Canvas><div className="scene-vignette" /><div className="scene-grain" />
       <div className="scene-topline"><span><span className="live-dot" /> LIVE IN GLOAMWOOD</span></div>
     </div>
     <aside className={`hud ${showHud ? 'hud-open' : ''}`}>
@@ -362,7 +375,7 @@ function App() {
     <div className="bottom-left"><span className="coord">{Math.round(player[0] * 10) / 10}° W &nbsp; · &nbsp; {Math.round(player[1] * 10) / 10}° N</span></div>
     <div className="move-pad"><button aria-label="Move up" {...control('ArrowUp')}><ArrowUp size={17} /></button><div><button aria-label="Move left" {...control('ArrowLeft')}><ArrowLeft size={17} /></button><button className="pad-center"><span>✦</span></button><button aria-label="Move right" {...control('ArrowRight')}><ArrowRight size={17} /></button></div><button aria-label="Move down" {...control('ArrowDown')}><ArrowDown size={17} /></button></div>
     {paused && !showCongratulations && !gameOver && !showWelcome && <div className="paused-overlay"><div className="pause-card"><Moon size={29} fill="currentColor" /><span>REST YOUR FEET</span><h2>The courtyard<br /><em>can wait.</em></h2><button onClick={() => setPaused(false)}>BACK TO THE NIGHT <Play size={13} fill="currentColor" /></button></div></div>}
-    <button className={`net-button ${nearby && !paused ? 'net-ready' : ''} ${throwing ? 'net-throwing' : ''}`} onClick={catchGhost} disabled={paused || throwing}><span className="net-icon">✧</span><span><strong>{throwing ? 'CATCHING…' : nearby === 'witch' ? 'CATCH BONUS' : nearby ? 'CATCH GHOST' : 'THROW YOUR NET'}</strong><small>{nearby === 'witch' ? 'THE WITCH KEEPER IS NEAR!' : nearby ? 'A spirit is close enough!' : 'GET CLOSE TO A SPIRIT'}</small></span><kbd>SPACE</kbd></button>
+    <button className={`net-button ${nearby && !paused ? 'net-ready' : ''} ${throwing ? 'net-throwing' : ''}`} onClick={() => catchGhost()} disabled={paused || throwing}><span className="net-icon">✧</span><span><strong>{throwing ? 'CATCHING…' : nearby === 'witch' ? 'CATCH BONUS' : nearby ? 'CATCH GHOST' : 'THROW YOUR NET'}</strong><small>{nearby === 'witch' ? 'TAP THE WITCH FOR A BONUS' : nearby ? 'TAP A SPIRIT OR THROW YOUR NET' : 'GET CLOSE TO A SPIRIT'}</small></span><kbd>SPACE</kbd></button>
     {showCongratulations && <div className="congrats-overlay"><section className="congrats-card" role="dialog" aria-modal="true" aria-labelledby="congrats-title"><div className="congrats-moon"><Moon size={27} fill="currentColor" /><SparkleIcon size={14} /></div><span className="congrats-eyebrow">GLOAMWOOD FIELD GUIDE COMPLETE</span><h2 id="congrats-title">The night is<br /><em>yours, Keeper.</em></h2><p>You caught every little haunt and found the Witch Keeper bonus. The courtyard is finally at peace.</p><div className="congrats-count"><SparkleIcon size={14} /> {ghostRoster.length + 1} / {ghostRoster.length + 1} HAUNTS COLLECTED</div><div className="congrats-actions"><button className="congrats-primary" onClick={reset}>PLAY AGAIN <RotateCcw size={14} /></button><button className="congrats-secondary" onClick={() => { setShowCongratulations(false); setPaused(false) }}>KEEP EXPLORING</button></div></section></div>}
     {showWelcome && <div className="congrats-overlay welcome-overlay"><section className="congrats-card welcome-card" role="dialog" aria-modal="true" aria-labelledby="welcome-title"><div className="congrats-moon"><Moon size={27} fill="currentColor" /><SparkleIcon size={14} /></div><span className="congrats-eyebrow">A MOONLIT ADVENTURE</span><h2 id="welcome-title">Welcome to<br /><em>Gloamwood.</em></h2><p>Wander the castle courtyard, catch mischievous ghosts, and watch out for the Witch Keeper.</p><div className="welcome-controls"><span><kbd className="wasd-keys" aria-label="W A S D"><i>W</i><i>A</i><i>S</i><i>D</i></kbd> MOVE</span><span><kbd>SPACE</kbd> CATCH</span></div><div className="congrats-actions"><button className="congrats-primary" onClick={startGame}>PLAY GAME <Play size={14} fill="currentColor" /></button></div></section></div>}
     {gameOver && <div className="congrats-overlay"><section className="congrats-card game-over-card" role="dialog" aria-modal="true" aria-labelledby="game-over-title"><div className="congrats-moon"><Ghost size={27} /><SparkleIcon size={14} /></div><span className="congrats-eyebrow">YOUR COURTYARD ADVENTURE ENDS</span><h2 id="game-over-title">The night<br /><em>claims you.</em></h2><p>{lives === 0 ? 'The ghosts used up all your lives.' : 'The Witch Keeper caught you in her spell.'} Take a breath, then try the courtyard again.</p><div className="congrats-actions"><button className="congrats-primary" onClick={reset}>TRY AGAIN <RotateCcw size={14} /></button></div></section></div>}
