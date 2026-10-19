@@ -1,22 +1,26 @@
 # Gloamwood: Ghost Keeper
 
-A spooky little castle courtyard game built with React, Three.js, Vite, TypeScript, and Tailwind CSS. Explore the courtyard, catch five ghosts with your net, avoid the Witch Keeper, and complete the field guide.
+A spooky little ghost-catching game set in a 3D castle courtyard. Explore as the Ghost Keeper, catch five wandering spirits with your net, and try to collect the Witch Keeper as a bonus.
 
-## Run locally
+Built with React, Three.js, React Three Fiber, Vite, TypeScript, and Tailwind CSS.
+
+## Play locally
 
 ```sh
 npm install
 npm run dev
 ```
 
-## Controls
+Open the local URL printed by Vite. The welcome screen starts the game and soundtrack together.
 
-- **WASD** or arrow keys to move (touch controls are available on smaller screens)
-- **Space** to throw the net
-- **P** to pause
+## How to play
 
-The speaker button toggles the looping soundtrack. Catching the Witch Keeper is optional for the bonus, but she can end the run if you touch her.
+- Move with **WASD** or the **arrow keys**. On phones and tablets, use the on-screen direction pad.
+- Press **Space** or the net button to catch a nearby ghost.
+- Press **P** or the pause button to pause.
+- Open the journal to see your collection and toggle the looping music.
+- Ghost collisions cost a life. Touching the Witch Keeper ends the run, so keep your distance if you want to catch her for the bonus.
 
-## Asset credits
+## Assets and credits
 
-Credits and license notes for the 3D models are in [`public/models/ATTRIBUTION.md`](public/models/ATTRIBUTION.md). The soundtrack source and license are in [`public/audio/ATTRIBUTION.txt`](public/audio/ATTRIBUTION.txt).
+The 3D model credits and license notes are in [`public/models/ATTRIBUTION.md`](public/models/ATTRIBUTION.md). The looping soundtrack, **“Silent Spooky Halloween” by SOUND_GARAGE**, is from Pixabay; its source and license are recorded in [`public/audio/ATTRIBUTION.txt`](public/audio/ATTRIBUTION.txt).
