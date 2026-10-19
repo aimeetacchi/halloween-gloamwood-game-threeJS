@@ -1,4 +1,4 @@
-import { Canvas, useFrame } from '@react-three/fiber'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
 import { ContactShadows, PerspectiveCamera, Sparkles, useAnimations, useGLTF } from '@react-three/drei'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import * as THREE from 'three'
@@ -13,6 +13,17 @@ const ghostRoster: GhostInfo[] = [
   { id: 'cobweb', name: 'Cobweb', kind: 'Dusty Crypt Wisp', color: '#d9c6f2', accent: '#ad91d4', x: -4.4, z: 2.6, rarity: 'UNCOMMON' },
   { id: 'moonbeam', name: 'Moonbeam', kind: 'Moonlit Spirit', color: '#a9c8ff', accent: '#759ef0', x: 4.35, z: 1.45, rarity: 'RARE' },
 ]
+
+function CourtyardCamera() {
+  const { camera, size } = useThree()
+  const portrait = size.width / size.height < 0.75
+  useEffect(() => {
+    if (!(camera instanceof THREE.PerspectiveCamera)) return
+    camera.fov = portrait ? 58 : 42
+    camera.updateProjectionMatrix()
+  }, [camera, portrait])
+  return <PerspectiveCamera makeDefault position={[10, 14, 12]} fov={42} near={0.1} far={100} onUpdate={(view) => view.lookAt(0, 0, 0)} />
+}
 
 function Ghostling({ data, caught, player, onApproach, onCatch }: { data: GhostInfo; caught: boolean; player: [number, number]; onApproach: (id: string, near: boolean) => void; onCatch: (id: string) => void }) {
   const group = useRef<THREE.Group>(null)
@@ -56,7 +67,7 @@ function Ghostling({ data, caught, player, onApproach, onCatch }: { data: GhostI
     group.current.rotation.y = Math.sin(t * 0.7) * 0.18
   })
   if (caught) return null
-  return <group ref={group} onClick={(event) => { event.stopPropagation(); onCatch(data.id) }}><primitive object={model} scale={useBatGhost ? 0.28 : 0.42} /><pointLight color={data.color} intensity={0.75} distance={2.7} /></group>
+  return <group ref={group} onClick={(event) => { event.stopPropagation(); onCatch(data.id) }}><primitive object={model} scale={useBatGhost ? 0.28 : 0.42} /><mesh position={[0, 0.76, 0]}><sphereGeometry args={[0.72, 12, 10]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh><pointLight color={data.color} intensity={0.75} distance={2.7} /></group>
 }
 
 function Player({ input, paused, playerRef, onMove, netSwing, resetVersion }: { input: React.MutableRefObject<Set<string>>; paused: boolean; playerRef: React.MutableRefObject<THREE.Group | null>; onMove: (x: number, z: number) => void; netSwing: number; resetVersion: number }) {
@@ -172,6 +183,7 @@ function WitchKeeper({ caught, player, onApproach, onCatch }: { caught: boolean;
   if (caught) return null
   return <group position={[-2.5, 0, 1.3]} rotation={[0, Math.PI * 0.82, 0]} scale={0.82} onClick={(event) => { event.stopPropagation(); onCatch('witch') }}>
     <primitive object={model} />
+    <mesh position={[0, 0.9, 0]}><sphereGeometry args={[0.7, 12, 10]} /><meshBasicMaterial transparent opacity={0} depthWrite={false} /></mesh>
     <pointLight position={[0, 1.1, 0.15]} color="#ffcf93" intensity={0.32} distance={2.4} />
   </group>
 }
@@ -207,7 +219,7 @@ function CastleScene({ caught, player, input, paused, onMove, onApproach, onCatc
   return <>
     <color attach="background" args={['#11101d']} />
     <fog attach="fog" args={['#11101d', 13, 25]} />
-    <PerspectiveCamera makeDefault position={[10, 14, 12]} fov={42} near={0.1} far={100} onUpdate={(camera) => camera.lookAt(0, 0, 0)} />
+    <CourtyardCamera />
     <ambientLight intensity={1.1} color="#c0bad8" />
     <directionalLight position={[-5, 12, 6]} intensity={2.2} color="#d8d0ff" castShadow shadow-mapSize={[1024, 1024]} shadow-camera-left={-12} shadow-camera-right={12} shadow-camera-top={12} shadow-camera-bottom={-12} />
     <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, -0.08, 0]} receiveShadow><planeGeometry args={[200, 200]} /><meshStandardMaterial color="#161822" roughness={1} /></mesh>
@@ -309,7 +321,8 @@ function App() {
     const targetX = id === 'witch' ? -2.5 : ghost?.x
     const targetZ = id === 'witch' ? 1.3 : ghost?.z
     if (targetX === undefined || targetZ === undefined) return
-    if (Math.hypot(targetX - player[0], targetZ - player[1]) > 2.05) {
+    const outOfReach = Math.hypot(targetX - player[0], targetZ - player[1]) > 2.05
+    if (outOfReach && !window.matchMedia('(pointer: coarse)').matches) {
       setNotice('Too far away! Move closer, then tap the spirit to catch it.')
       return
     }
